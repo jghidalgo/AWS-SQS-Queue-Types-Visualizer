@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS SQS Queue Types Visualizer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>AWS SQS Queue Types Visualizer</h1>
+            <p>Interactive demonstration of Standard, FIFO, and Dead Letter Queues</p>
+        </header>
+
+        <div class="queue-selector">
+            <button class="queue-btn active" data-queue="standard">Standard Queue</button>
+            <button class="queue-btn" data-queue="fifo">FIFO Queue</button>
+            <button class="queue-btn" data-queue="dlq">Dead Letter Queue</button>
+        </div>
+
+        <div class="controls">
+            <div class="message-input">
+                <input type="text" id="message-content" placeholder="Enter message content" value="Hello World">
+                <input type="text" id="message-group" placeholder="Message Group ID (FIFO only)" style="display: none;">
+                <button onclick="sendMessage()" class="btn-send">Send Message</button>
+            </div>
+            <div class="batch-controls">
+                <button onclick="sendBatchMessages()" class="btn-batch">Send 10 Messages</button>
+                <button onclick="simulateFailure()" class="btn-failure">Simulate Processing Failure</button>
+                <button onclick="clearQueue()" class="btn-clear">Clear Queue</button>
+            </div>
+        </div>
+
+        <div class="queue-stats">
+            <div class="stat-card">
+                <span class="stat-label">Messages in Queue:</span>
+                <span class="stat-value" id="messages-count">0</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Messages Sent:</span>
+                <span class="stat-value" id="messages-sent">0</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Messages Processed:</span>
+                <span class="stat-value" id="messages-processed">0</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Failed Messages:</span>
+                <span class="stat-value" id="messages-failed">0</span>
+            </div>
+        </div>
+
+        <div class="queue-visualization">
+            <div class="queue-container" id="queue-container">
+                <div class="queue-header">
+                    <h3 id="queue-title">Standard Queue</h3>
+                    <div class="queue-properties" id="queue-properties">
+                        <span class="property">✅ High Throughput</span>
+                        <span class="property">⚡ At-least-once Delivery</span>
+                        <span class="property">🔀 Best-effort Ordering</span>
+                    </div>
+                </div>
+                <div class="messages-flow">
+                    <div class="producer-section">
+                        <div class="producer">📤 Producer</div>
+                        <div class="arrow-right">→</div>
+                    </div>
+                    <div class="queue-section">
+                        <div class="queue-box" id="queue-box">
+                            <div class="queue-messages" id="queue-messages">
+                                <!-- Messages will be added here -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="consumer-section">
+                        <div class="arrow-right">→</div>
+                        <div class="consumer">📥 Consumer</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="processing-area">
+            <h3>Message Processing</h3>
+            <div class="processing-messages" id="processing-messages">
+                <!-- Processing messages will appear here -->
+            </div>
+        </div>
+
+        <div class="info-panels">
+            <div class="info-card" id="standard-info">
+                <h3>Standard Queue</h3>
+                <div class="features">
+                    <div class="feature">
+                        <strong>Throughput:</strong> Nearly unlimited messages per second
+                    </div>
+                    <div class="feature">
+                        <strong>Delivery:</strong> At-least-once (may receive duplicates)
+                    </div>
+                    <div class="feature">
+                        <strong>Ordering:</strong> Best-effort ordering (not guaranteed)
+                    </div>
+                    <div class="feature">
+                        <strong>Use Cases:</strong> High-volume, fault-tolerant applications
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-card" id="fifo-info" style="display: none;">
+                <h3>FIFO Queue</h3>
+                <div class="features">
+                    <div class="feature">
+                        <strong>Throughput:</strong> Up to 3,000 messages per second
+                    </div>
+                    <div class="feature">
+                        <strong>Delivery:</strong> Exactly-once processing
+                    </div>
+                    <div class="feature">
+                        <strong>Ordering:</strong> Strict FIFO ordering guaranteed
+                    </div>
+                    <div class="feature">
+                        <strong>Deduplication:</strong> Built-in message deduplication
+                    </div>
+                    <div class="feature">
+                        <strong>Use Cases:</strong> Financial transactions, order processing
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-card" id="dlq-info" style="display: none;">
+                <h3>Dead Letter Queue</h3>
+                <div class="features">
+                    <div class="feature">
+                        <strong>Purpose:</strong> Handle messages that can't be processed
+                    </div>
+                    <div class="feature">
+                        <strong>Trigger:</strong> After maximum receive count exceeded
+                    </div>
+                    <div class="feature">
+                        <strong>Benefits:</strong> Isolate problematic messages for analysis
+                    </div>
+                    <div class="feature">
+                        <strong>Monitoring:</strong> Set up CloudWatch alarms for DLQ messages
+                    </div>
+                    <div class="feature">
+                        <strong>Use Cases:</strong> Error handling, debugging, message recovery
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="code-examples">
+            <h3>Code Examples</h3>
+            <div class="code-tabs">
+                <button class="code-tab active" data-tab="send">Send Message</button>
+                <button class="code-tab" data-tab="receive">Receive Message</button>
+                <button class="code-tab" data-tab="batch">Batch Operations</button>
+            </div>
+            <div class="code-content">
+                <pre id="send-code"><code>// Send message to SQS
+const AWS = require('aws-sdk');
+const sqs = new AWS.SQS();
+
+const params = {
+    QueueUrl: 'https://sqs.region.amazonaws.com/account/queue-name',
+    MessageBody: 'Hello World',
+    // For FIFO queues:
+    MessageGroupId: 'group1',
+    MessageDeduplicationId: 'unique-id-123'
+};
+
+sqs.sendMessage(params, (err, data) => {
+    if (err) console.log(err);
+    else console.log('Message sent:', data.MessageId);
+});</code></pre>
+
+                <pre id="receive-code" style="display: none;"><code>// Receive messages from SQS
+const params = {
+    QueueUrl: 'https://sqs.region.amazonaws.com/account/queue-name',
+    MaxNumberOfMessages: 10,
+    WaitTimeSeconds: 20, // Long polling
+    VisibilityTimeout: 30
+};
+
+sqs.receiveMessage(params, (err, data) => {
+    if (err) console.log(err);
+    else {
+        data.Messages?.forEach(message => {
+            console.log('Received:', message.Body);
+            
+            // Delete message after processing
+            sqs.deleteMessage({
+                QueueUrl: params.QueueUrl,
+                ReceiptHandle: message.ReceiptHandle
+            });
+        });
+    }
+});</code></pre>
+
+                <pre id="batch-code" style="display: none;"><code>// Send batch messages
+const params = {
+    QueueUrl: 'https://sqs.region.amazonaws.com/account/queue-name',
+    Entries: [
+        {
+            Id: '1',
+            MessageBody: 'Message 1',
+            MessageGroupId: 'group1' // FIFO only
+        },
+        {
+            Id: '2', 
+            MessageBody: 'Message 2',
+            MessageGroupId: 'group1' // FIFO only
+        }
+    ]
+};
+
+sqs.sendMessageBatch(params, (err, data) => {
+    if (err) console.log(err);
+    else console.log('Batch sent:', data.Successful.length);
+});</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
